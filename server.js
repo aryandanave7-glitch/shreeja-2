@@ -33,19 +33,28 @@ app.post("/claim-id", async (req, res) => {
         return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // NEW RULE: Check if this public key already owns a DIFFERENT ID
+    const allKeys = await storage.keys();
+    for (const key of allKeys) {
+        const item = await storage.getItem(key);
+        if (item && item.pubKey === pubKey && key !== customId) {
+            return res.status(409).json({ error: "You already own a different ID. Please delete it before claiming a new one." });
+        }
+    }
+
+    // OLD RULE: Check if the requested ID is taken by someone else
     const existingItem = await storage.getItem(customId);
     if (existingItem && existingItem.pubKey !== pubKey) {
-        // ID exists and belongs to someone else
         return res.status(409).json({ error: "ID already taken" });
     }
 
+    // If all checks pass, proceed to store/update the ID
     const value = {
         code: fullInviteCode,
         pubKey: pubKey,
         permanent: persistence === 'permanent'
     };
     
-    // Set TTL only for temporary IDs (24 hours in ms)
     const ttl = (persistence === 'temporary') ? 24 * 60 * 60 * 1000 : false;
     await storage.setItem(customId, value, { ttl });
 
