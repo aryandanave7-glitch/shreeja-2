@@ -70,16 +70,20 @@ app.get("/get-invite/:id", async (req, res) => {
 // Endpoint to find a user's current ID by their public key
 app.get("/get-id-by-pubkey/:pubkey", async (req, res) => {
     const pubkey = req.params.pubkey;
-    const allIds = await storage.values();
-    const userEntry = allIds.find(item => item.pubKey === pubkey);
+    const allKeys = await storage.keys();
 
-    if (userEntry) {
-        const allKeys = await storage.keys();
-        const userSyrjaId = allKeys.find(key => storage.getItem(key).pubKey === pubkey);
-        res.json({ id: userSyrjaId, permanent: userEntry.permanent });
-    } else {
-        res.status(404).json({ error: "No ID found for this public key" });
+    for (const key of allKeys) {
+        const item = await storage.getItem(key);
+        if (item && item.pubKey === pubkey) {
+            // Found a match!
+            console.log(`🔎 Found ID for pubkey ${pubkey.slice(0,12)}... -> ${key}`);
+            return res.json({ id: key, permanent: item.permanent });
+        }
     }
+
+    // If the loop finishes without finding a match
+    console.log(`🔎 No ID found for pubkey ${pubkey.slice(0,12)}...`);
+    res.status(404).json({ error: "No ID found for this public key" });
 });
 
 // Endpoint to delete an ID, authenticated by public key
